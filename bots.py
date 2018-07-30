@@ -38,24 +38,25 @@ for num in range(map_width):
 
 
 class Bot:
-    def __init__(self, x_map, y_map, counter, direction, best_gens):
+    def __init__(self, x_map, y_map, counter, direction, best_gens, numb):
         self.x_map = x_map
         self.y_map = y_map
         self.counter = counter
         self.direction = direction
         self.best_gens = best_gens
+        self.numb = numb
+        # /////////////////////////////////////
         self.energy = 100
         self.dna = []
-        # /////////////////////////////////////
         self.new_y = 0
         self.new_x = 0
         self.new_direction = 0
-        self.what = 0
+        self.coord = 0
 
         if self.best_gens:
             self.dna = self.best_gens
         else:
-            for gen in range(64):
+            for gen in range(DnaAmount):
                 self.dna.append(random.randint(0, 63))
                 # print("[", gen, "] =", self.dna[gen])
             # print("dna =", self.dna)
@@ -63,8 +64,7 @@ class Bot:
     # ///////////////////////////////////// (вспомогательные)
     def mutate(self):
         for m in range(num_of_mutations):
-            # print(m+1, "mut")
-            self.dna[random.randint(0, 63)] = random.randint(0, 63)
+            self.dna[random.randint(0, DnaAmount-1)] = random.randint(0, 63)
             # print("mut dna =", self.dna)
 
     def trans(self, where):
@@ -114,6 +114,35 @@ class Bot:
         if self.new_x < 0:
             self.new_x = map_width-2
         # /////////////////////////////////////
+        self.coord = Map[self.new_y][self.new_x]
+
+    def try_to_move(self):
+
+        if self.coord == 2:  # Если там пусто
+            self.just_go()
+
+        elif self.coord == 5 or self.coord == 6:  # Если там еда или труп
+            self.just_go()
+            self.en(10)
+            if self.coord == 5:  # Пересоздаем еду
+                new_food()
+
+        elif self.coord == 7:  # Если там яд
+            self.just_go()
+            self.energy = 0
+            new_tox()
+
+    def try_to_catch(self):
+        if self.coord == 5 or self.coord == 6:  # Если там еда или труп
+            self.en(10)
+            Map[self.new_y][self.new_x] = 2
+            if self.coord == 5:
+                new_food()
+
+        elif self.coord == 7:  # Если там яд
+            self.en(20)
+            Map[self.new_y][self.new_x] = 2
+            new_tox()
 
     def just_go(self):
         Map[self.y_map][self.x_map] = 2
@@ -121,178 +150,124 @@ class Bot:
         self.y_map = self.new_y
         Map[self.new_y][self.new_x] = 4
 
+    def norm_jump(self):
+        place = self.counter + self.coord
+        if place > DnaAmount-1:
+            place -= DnaAmount
+        self.counter += self.dna[place]
+
     def en(self, en):
         self.energy += en
         if self.energy > 100:
             self.energy = 100
+
     # ///////////////////////////////////// (вспомогательные)
     # 2 - пустота, 3 - стена, 4 - бот, 5 - еда, 6 - труп, 7 - яд.
 
-    def move(self):
+    def move(self):  # 0 - 7
         self.energy -= 1
         where = (self.dna[self.counter] % 8 + self.direction) % 8
         self.trans(where)
-        coord = Map[self.new_y][self.new_x]
+        self.try_to_move()
 
-        if coord == 2:
-            self.just_go()
-
-        elif coord == 5 or coord == 6:  # Если там еда или труп
-            self.just_go()
-            self.en(10)
-            if coord == 5:
-                new_food()
-            # print("бот", self.number, "съел еду")
-
-        elif coord == 7:  # Если там яд
-            self.just_go()
-            self.energy = 0
-            new_tox()
-        place = self.counter + coord
-        if place > 63:
-            place -= 64
-        self.counter += self.dna[place]
+        self.counter += 1
 
     def catch(self):
         self.energy -= 1
         where = (self.dna[self.counter] % 8 + self.direction) % 8
         self.trans(where)
 
-        coord = Map[self.new_y][self.new_x]
-        if coord == 5 or coord == 6:  # Если там еда или труп
-            self.en(10)
-            Map[self.new_y][self.new_x] = 2
-            if coord == 5:
-                new_food()
-                # print("бот", self.number, "съел еду")
+        self.try_to_catch()
 
-        elif coord == 7:  # Если там яд
-            self.en(20)
-            Map[self.new_y][self.new_x] = 2
-            # print("Преобразовал яд - красавчик!")
-            new_tox()
-        place = self.counter + coord
-        if place > 63:
-            place -= 64
-        self.counter += self.dna[place]
+        self.counter += 1
 
     def turn(self):  # 16-23
-        # print("turn вызвали?")
         where = (self.dna[self.counter] % 8 + self.direction) % 8
         self.trans(where)
         self.direction = self.new_direction
-        # print(" dir-", self.direction)
         self.counter += 1
 
     def move_rel(self):  # 24
         self.energy -= 1
+
         cou = self.counter
-        if cou == 63:
-            cou -= 64
+        if cou == DnaAmount-1:
+            cou -= DnaAmount
         where = (self.dna[cou+1] % 8 + self.direction) % 8
         self.trans(where)
-        coord = Map[self.new_y][self.new_x]
+        self.try_to_move()
 
-        if coord == 2:
-            self.just_go()
-        elif coord == 5 or coord == 6:  # Если там еда или труп
-            self.just_go()
-            self.en(10)
-            if coord == 5:
-                new_food()
-        elif coord == 7:  # Если там яд
-            self.just_go()
-            self.energy = 0
-            new_tox()
-        place = self.counter + coord
-        if place > 63:
-            place -= 64
-        self.counter += self.dna[place]
+        self.counter += 1
 
     def look(self):  # 25
         cou = self.counter
-        if cou == 63:
-            cou -= 64
+        if cou == DnaAmount-1:
+            cou -= DnaAmount
         where = (self.dna[cou+1] % 8 + self.direction) % 8
         self.trans(where)
         # print("where -", where)
-        coord = Map[self.new_y][self.new_x]
-        # print("Впереди вижу", coord)
-        place = self.counter + coord
-        if place > 63:
-            place -= 64
-        self.counter += self.dna[place]
+        # print("Впереди вижу", self.coord)
+        self.norm_jump()
 
     def energy_amo(self):  # 26
         cou = self.counter
-        if cou == 63:
-            cou -= 64
+        if cou == DnaAmount-1:
+            cou -= DnaAmount
 
         need = self.dna[cou + 1] * 15
         if self.energy >= need:
             place = self.counter + 3
-            if place > 63:
-                place -= 64
+            if place > DnaAmount-1:
+                place -= DnaAmount
             self.counter += self.dna[place]
         else:
             place = self.counter + 2
-            if place > 63:
-                place -= 64
+            if place > DnaAmount-1:
+                place -= DnaAmount
             self.counter += self.dna[place]
 
     def catch_rel(self):  # 27
         self.energy -= 1
         cou = self.counter
-        if cou == 63:
-            cou -= 64
+        if cou == DnaAmount-1:
+            cou -= DnaAmount
         where = (self.dna[cou + 1] % 8 + self.direction) % 8
         self.trans(where)
+        self.try_to_catch()
 
-        coord = Map[self.new_y][self.new_x]
-        if coord == 5 or coord == 6:  # Если там еда или труп
-            self.en(10)
-            Map[self.new_y][self.new_x] = 2
-            if coord == 5:
-                new_food()
-                # print("бот", self.number, "съел еду")
-
-        elif coord == 7:  # Если там яд
-            self.en(20)
-            Map[self.new_y][self.new_x] = 2
-            # print("Преобразовал яд - красавчик!")
-            new_tox()
-        place = self.counter + coord
-        if place > 63:
-            place -= 64
-        self.counter += self.dna[place]
+        self.norm_jump()
 
     def jump(self):
         self.counter += code
 
 # Создаем ботов, еду
 bots = []
-BotsAmount = 64
-num_of_mutations = 1
-ChildAmount = int(pow(BotsAmount, 0.5))
+BotsAmount = 25
+DnaAmount = 64
+SurvivorsAmount = int(pow(BotsAmount, 0.5))
 FoodAmount = int(map_width * map_height * 0.05)
 ToxAmount = int(map_width * map_height * 0.07)
 BestGens = []
 
 
-def new_bot():
+def new_bot(nomer_bot):
     x = random.randint(0, map_width - 1)  # x - для удобства
     y = random.randint(1, map_height - 2)  # y - для удобства
     if Map[y][x] == 2:
         Map[y][x] = 4
         if BestGens:
-            bots.append(Bot(x, y, 0, 0, BestGens))
+            bots.append(Bot(x, y, 0, 0, BestGens, nomer_bot))
         else:
-            # gens = [17,25,0,8,63,63,8,8,16,24,0,56,56,56,56,56,56,27,0,48,48,48,48,48,47]
-            # for n in range(39):
-            #     gens.append(0)
-            bots.append(Bot(x, y, 0, 0, []))  # gens вместо []
+            # gens = [17,25,0,63,8,8,16,16,24,25,4,25,55,55,25,25,32,24,0,47,47,47,47,47,47,27,0,
+            #        39,39,39,39,39,39,24,4,31,31,31,31,31,31,27,4,23,23,23,23,23,23]
+            # gens = [17, 25, 0, 8, 63, 63, 8, 8, 10, 0, 55, 8, 53, 53, 53, 53, 53, 53]
+            # gens = [17, 25, 7, 8, 8, 8, 16, 16, 16, 25, 0, 10, 55, 55, 10, 10, 12, 15, 48, 0, 46, 8, 44]
+            # for n in range(DnaAmount-len(gens)):
+                # gens.append(random.randint(0, 63))
+            bots.append(Bot(x, y, 0, 0, [], nomer_bot))  # gens вместо []
+            # print(len(gens))
     else:
-        new_bot()
+        new_bot(nomer_bot)
 
 
 def new_food():
@@ -314,7 +289,7 @@ def new_tox():
 
 
 for b in range(BotsAmount):
-    new_bot()
+    new_bot(b)
 
 for f in range(FoodAmount):
     new_food()
@@ -334,8 +309,8 @@ gener = 1
 cyc = 0
 BestCyc = 0
 while game:
-    for liver in bots:
-
+    cyc += 1
+    for bot in bots:
         # pygame.time.delay(500)  # Задержка в ms
 
         # обработка событий
@@ -359,14 +334,17 @@ while game:
         while ending < 15 and hod:
             code = bots[botNum].dna[bots[botNum].counter]
             if 0 <= code <= 7:  # Движение (заверщающий)
+                # print("move")
                 bots[botNum].move()
                 hod = False
 
             if 8 <= code <= 15:  # Схватить (заверщающий)
+                # print("catch")
                 bots[botNum].catch()
                 hod = False
 
             if 16 <= code <= 23:  # Повернуться
+                # print("turn")
                 bots[botNum].turn()
                 ending += 1
 
@@ -377,6 +355,7 @@ while game:
             if code == 25:  # Посмотреть
                 bots[botNum].look()
                 ending += 1
+                # print("look")
 
             if code == 26:  # Кол-во энергии
                 bots[botNum].energy_amo()
@@ -386,31 +365,33 @@ while game:
                 bots[botNum].catch_rel()
                 hod = False
 
-            if 28 <= code <= 63:  # Безусловный переход
+            if 28 <= code <= DnaAmount-1:  # Безусловный переход
                 bots[botNum].jump()
                 ending += 1
 
-            if bots[botNum].counter > 63:
-                bots[botNum].counter -= 64
+            if bots[botNum].counter > DnaAmount-1:
+                bots[botNum].counter -= DnaAmount
 
             if ending > 14:
-                bots[botNum].energy -= 5
+                bots[botNum].energy -= 1
         # //////////////////////////////////
 
         # Проверка на смерть
         if bots[botNum].energy <= 0:
+            # print(len(bots[botNum].dna))
             Map[bots[botNum].y_map][bots[botNum].x_map] = 6
             bots.pop(botNum)
             botNum -= 1
             # print("осталось ботов:", len(bots))
         # //////////////////////////////////
 
+        # Ходит следующий бот
         botNum += 1
         if botNum == len(bots):
             botNum = 0
-            cyc += 1
+        # //////////////////////////////////
 
-        if len(bots) == ChildAmount:
+        if len(bots) == SurvivorsAmount:
             botNum = 0
             if BestCyc < cyc:
                 BestCyc = cyc
@@ -418,14 +399,12 @@ while game:
             cyc = 0
             gener += 1
             # Создаем новую карту
-            i_y = 0
-            while i_y < len(Map):
-                i_x = 0
-                while i_x < len(Map[i_y]):
-                    if Map[i_y][i_x] != 3:
-                        Map[i_y][i_x] = 2
-                    i_x += 1
-                i_y += 1
+            for hei in range(map_height):
+                for wid in range(map_width):
+                    if Map[hei][wid] != 3:
+                        Map[hei][wid] = 2
+                    wid += 1
+                hei += 1
             for f in range(FoodAmount):
                 new_food()
             for t in range(ToxAmount):
@@ -433,17 +412,23 @@ while game:
             # //////////////////////////////////
 
             # Создаем новое поколение
-            for b in range(ChildAmount):
+            i = 0
+            ChildMutAmount = random.randint(0, SurvivorsAmount)
+            num_of_mutations = random.randint(1, int(DnaAmount*0.05))
+            for S in range(SurvivorsAmount):
+                # print(i)
                 BestGens = bots[0].dna
                 # print("best-", bots[0].dna)
                 # print(len(BestGens))
-                # print("Бот", bots[0].number, "дал потомков - ", ChildAmount)
+                print("Бот родитель", bots[0].numb, "имел энергии", bots[0].energy, "днк -", bots[0].dna)
                 bots.pop(0)
-                for child in range(ChildAmount-1):
-                    new_bot()
-                    # и один с мутацией
-                new_bot()
-                bots[len(bots)-1].mutate()
+                for child in range(SurvivorsAmount-ChildMutAmount):  # Нормальное потомство
+                    new_bot(i)
+                    i += 1
+                for r in range(ChildMutAmount):
+                    new_bot(i)  # и пара с мутацией
+                    i += 1
+                    bots[len(bots)-1].mutate()
                 BestGens = []
             # //////////////////////////////////
 
@@ -451,22 +436,19 @@ while game:
     screen.fill(black)
     if paint:
         # Отрисовка карты
-        i_y = 0
-        while i_y < len(Map):
-            i_x = 0
-            while i_x < len(Map[i_y]):
-                if Map[i_y][i_x] == 3:
-                    pygame.draw.rect(screen, brown, [i_x * length, i_y * length, length, length])
-                if Map[i_y][i_x] == 4:
-                    pygame.draw.rect(screen,  blue, [i_x * length, i_y * length, length, length])
-                if Map[i_y][i_x] == 5:
-                    pygame.draw.rect(screen, green, [i_x * length, i_y * length, length, length])
-                if Map[i_y][i_x] == 6:
-                    pygame.draw.rect(screen, white, [i_x * length, i_y * length, length, length])
-                if Map[i_y][i_x] == 7:
-                    pygame.draw.rect(screen, red, [i_x * length, i_y * length, length, length])
-                i_x += 1
-            i_y += 1
+        for hei in range(map_height):
+            for wid in range(map_width):
+                if Map[hei][wid] == 3:
+                    pygame.draw.rect(screen, brown, [wid * length, hei * length, length, length])
+                if Map[hei][wid] == 4:
+                    pygame.draw.rect(screen, blue, [wid * length, hei * length, length, length])
+                if Map[hei][wid] == 5:
+                    pygame.draw.rect(screen, green, [wid * length, hei * length, length, length])
+                if Map[hei][wid] == 6:
+                    pygame.draw.rect(screen, white, [wid * length, hei * length, length, length])
+                if Map[hei][wid] == 7:
+                    pygame.draw.rect(screen, red, [wid * length, hei * length, length, length])
+                wid += 1
         pygame.display.flip()
         # //////////////////////////////////
     # //////////////////////////////////
